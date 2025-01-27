@@ -92,7 +92,7 @@ function handlePriceChangeHelper(symbol: string, price: Price) {
   for (const event of events) {
     if (event.code == "low-slot-hit-rate") {
       console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code} hit rate: ${((event as LowSlotHitRate).hitRate * 100).toFixed(1)}%`)
-      if ((event as LowSlotHitRate).hitRate < 0.25) {
+      if ((event as LowSlotHitRate).hitRate < 0.2) {
         timestreamDb.writeToTimestream({"timestamp": Math.floor(Date.now() / 1000), "symbol": symbol, "code": event.code, "hit_rate": (event as LowSlotHitRate).hitRate})
       }
     } else if (event.code == "start-publish" || event.code == "stop-publish") {
