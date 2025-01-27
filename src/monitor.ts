@@ -1,6 +1,7 @@
 import {AccountInfo, Cluster, clusterApiUrl, Commitment, Connection, Context, PublicKey} from '@solana/web3.js';
 import {LowSlotHitRate, Price, PublisherPrice, Validator} from "./validation";
 import {getPythProgramKeyForCluster, PriceData, Product, PythConnection} from "@pythnetwork/client";
+import TimeStreamDB from "./timestream_db";
 
 require('dotenv').config()
 
@@ -22,6 +23,8 @@ const pythConnection = new PythConnection(connection, PYTH_PROGRAM_KEY, SOLANA_C
 // The low balance alert will go off each time a wallet balance drops below one of these thresholds.
 // Must be in sorted order from low to high
 const LOW_BALANCE_THRESHOLDS_SOL=[5, 10, 25, 50, 75, 100]
+
+const timestreamDb = new TimeStreamDB()
 
 function onChainPriceToPrice(price: PriceData): Price {
   const latest: Record<string, PublisherPrice> = {}
@@ -89,12 +92,22 @@ function handlePriceChangeHelper(symbol: string, price: Price) {
   for (const event of events) {
     if (event.code == "low-slot-hit-rate") {
       console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code} hit rate: ${((event as LowSlotHitRate).hitRate * 100).toFixed(1)}%`)
+      if ((event as LowSlotHitRate).hitRate < 0.25) {
+        timestreamDb.writeToTimestream({"timestamp": Math.floor(Date.now() / 1000), "symbol": symbol, "code": event.code, "hit_rate": (event as LowSlotHitRate).hitRate})
+      }
     } else if (event.code == "start-publish" || event.code == "stop-publish") {
       console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code}`)
     } else {
       const aggregate = price.aggregate
       const publisherPrice = price.quoter_aggregates[event.publisher]
+      if (symbol.endsWith(".RR") && event.code == "improbable-aggregate") {
+        continue
+      }
+      if (aggregate.price === 0 ) {
+        continue
+      }
       console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code} aggregate: ${aggregate.price} ± ${aggregate.confidence} publisher: ${publisherPrice.price} ± ${publisherPrice.confidence}`)
+      timestreamDb.writeToTimestream({"timestamp": Math.floor(Date.now() / 1000), "symbol": symbol, "code": event.code, "aggregate_price": aggregate.price, "publisher_price": publisherPrice.price})
     }
   }
 }
