@@ -106,6 +106,10 @@ function handlePriceChangeHelper(symbol: string, price: Price) {
       if (aggregate.price === 0 ) {
         continue
       }
+      if (event.code == "improbable-aggregate" && Math.abs(1-(publisherPrice.price/aggregate.price)) < 0.05) {
+        console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code} aggregate: ${aggregate.price} ± ${aggregate.confidence} publisher: ${publisherPrice.price} ± ${publisherPrice.confidence}`)
+        continue
+      }
       console.log(`${(new Date()).toISOString()} ${symbol} ${event.publisher} ${event.code} aggregate: ${aggregate.price} ± ${aggregate.confidence} publisher: ${publisherPrice.price} ± ${publisherPrice.confidence}`)
       timestreamDb.writeToTimestream({"timestamp": Math.floor(Date.now() / 1000), "symbol": symbol, "code": event.code, "aggregate_price": aggregate.price, "publisher_price": publisherPrice.price})
     }
